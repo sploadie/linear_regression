@@ -84,11 +84,11 @@ end
 
 def solve_linear_regression(data)
 
-	# FIXME
-	puts 'FIXME: SCALING DATA'
-	old_data = data
-	data = calc_scaled_data(data)
-	# FIXME
+	# # FIXME
+	# puts 'FIXME: SCALING DATA'
+	# old_data = data
+	# data = calc_scaled_data(data)
+	# # FIXME
 
 	puts 'Data:'.yellow
 	data.each { |point| puts "--> Mileage: #{point[:mileage]} \t Price: #{point[:price]}" }
@@ -124,14 +124,14 @@ def solve_linear_regression(data)
 	puts ''
 	puts "estimatedPrice(mileage) = #{slope}(mileage) + #{y_intercept}".green
 
-	# FIXME
-	max, min = calc_data_max_min(old_data)
-	
-	slope = slope
-	puts ''
-	puts 'Unscaled...?'
-	puts "estimatedPrice(mileage) = #{slope}(mileage) + #{y_intercept}".green
-	# FIXME
+	# # FIXME
+	# max, min = calc_data_max_min(old_data)
+
+	# slope = slope
+	# puts ''
+	# puts 'Unscaled...?'
+	# puts "estimatedPrice(mileage) = #{slope}(mileage) + #{y_intercept}".green
+	# # FIXME
 
 	# Save theta
 	begin
@@ -173,31 +173,57 @@ end
 
 def teach(data)
 	# Fresh new values
+	# slope = 0.0
+	# y_intercept = 0.0
 	slope = 0.0
-	y_intercept = 0.0
+	y_intercept = 8499
 
 	# Standard learning rate for now
-	learning_rate = 1.0
+	slope_learning_rate = 0.1
+	y_intercept_learning_rate = 1000
 
 	# Get static variables
 	data_count = data.count
+	# mean = calc_mean(data, data_count)
+	# # FIXME
+	# y_intercept = mean[:price]
+	# # FIXME
 
-	# Standardize data
-	std_data = calc_standardized_data(data, data_count)
-	# p std_data
+	# # Standardize data
+	# std_data = calc_standardized_data(data, data_count)
+	# # p std_data
 
 	# Calculate theta
 	iteration = 0
+	prev_slope_error, prev_y_intercept_error = calc_mean_partial_error(slope, y_intercept, data, data_count)
 	puts "Iteration 0".yellow
 	puts "Slope: #{slope} \t Y Intercept: #{y_intercept}"
 
 	while $stdin.gets.chomp != 'q' do
 		10.times do
 			puts "Iteration #{iteration += 1}".yellow
-			slope_error, y_intercept_error = calc_mean_partial_error(slope, y_intercept, std_data, data_count)
+			slope_error, y_intercept_error = calc_mean_partial_error(slope, y_intercept, data, data_count)
 			puts "Slope Error: #{slope_error} \t Y Intercept Error: #{y_intercept_error}"
-			slope -= learning_rate * slope_error
-			y_intercept -= learning_rate * y_intercept_error
+			puts "Slope Error #{slope_error.abs < prev_slope_error.abs ? 'decreased' : 'increased'} \t Y Intercept Error #{y_intercept_error.abs < prev_y_intercept_error.abs ? 'decreased' : 'increased'}"
+			if slope_error.abs < prev_slope_error.abs
+				slope_learning_rate *= 1.05
+			else
+				slope_learning_rate *= 0.50
+			end
+			if y_intercept_error.abs < prev_y_intercept_error.abs
+				y_intercept_learning_rate *= 2.00
+			else
+				y_intercept_learning_rate *= 0.10
+			end
+			puts "Slope Learning Rate: #{slope_learning_rate} \t Y Intercept Learning Rate: #{y_intercept_learning_rate}"
+			# slope       -= learning_rate * slope_error
+			# y_intercept -= learning_rate * y_intercept_error
+			slope       -= slope_learning_rate       * (slope_error       / slope_error.abs)
+			y_intercept -= y_intercept_learning_rate * (y_intercept_error / y_intercept_error.abs)
+			prev_slope_error, prev_y_intercept_error = slope_error, y_intercept_error
+			# # FIXME
+			# y_intercept = mean[:price] - (slope * mean[:mileage])
+			# # FIXME
 			puts "Slope: #{slope} \t Y Intercept: #{y_intercept}"
 		end
 	end
