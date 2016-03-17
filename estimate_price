@@ -1,0 +1,19 @@
+#!/usr/bin/env ruby
+require_relative 'predict'
+require_relative 'color'
+
+print 'Car Mileage: '
+
+begin
+	mileage = Float($stdin.gets.chomp)
+rescue Exception => e
+	puts "Error: invalid mileage '#{mileage}'".red
+	exit
+end
+
+begin
+	price = predict_price_with_file(mileage)
+	puts "Predicted price: #{price}"
+rescue Exception => e
+	puts "Error: #{e.message}".red
+end
