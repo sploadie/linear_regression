@@ -4,6 +4,7 @@ def parse_csv(filepath)
 	csv_array = CSV.read filepath
 	raise 'CSV first line should be "km,price"' if csv_array.shift != ['km','price']
 	raise 'CSV file has no data'                if csv_array.count == 0
+	raise 'CSV file contains only one point'    if csv_array.count == 1
 
 	data = csv_array.map do |point|
 		begin

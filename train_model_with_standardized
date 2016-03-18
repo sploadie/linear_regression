@@ -9,7 +9,7 @@ begin
 
 	filepath = ARGV[0]
 
-	teach parse_csv(filepath)
+	teach_with_standardized parse_csv(filepath)
 
 rescue Exception => e
 	if e.message.empty?
@@ -17,5 +17,4 @@ rescue Exception => e
 	else
 		puts "Error: #{e.message}".red
 	end
-	puts 'Changing the '.red + 'learning rate'.light_blue + ' or '.red + 'feature scaling the data'.light_blue + ' may yield better results.'.red
 end

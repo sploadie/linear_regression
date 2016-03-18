@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+require_relative 'parse'
+require_relative 'teach'
+require_relative 'color'
+
+begin
+	raise 'CSV file path required' if ARGV.count == 0
+	raise 'too many arguments' if ARGV.count != 1
+
+	filepath = ARGV[0]
+
+	solve_with_standardized_data parse_csv(filepath)
+
+rescue Exception => e
+	puts "Error: #{e.message}".red
+end

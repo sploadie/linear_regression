@@ -1,6 +1,9 @@
 require_relative 'predict'
 require_relative 'color'
 
+class ThetaDiverged < Exception
+end
+
 def calc_mean(data, data_count)
 	mean = {price: 0.0, mileage: 0.0}
 	data.each do |point|
@@ -74,24 +77,43 @@ def calc_data_max_min(data)
 	return max, min
 end
 
+def calc_scaled_value(val, max, min)
+	(val - min) / (max - min)
+end
+
 def calc_scaled_data(data)
 	max, min = calc_data_max_min(data)
-	max_minus_min = {price: (max[:price] - min[:price]), mileage: (max[:mileage] - min[:mileage])}
 	data.map do |point|
-		{price: ((point[:price] - min[:price]) / max_minus_min[:price]), mileage: ((point[:mileage] - min[:mileage]) / max_minus_min[:mileage])}
+		{
+			price:   calc_scaled_value(point[:price],   max[:price],   min[:price]),
+			mileage: calc_scaled_value(point[:mileage], max[:mileage], min[:mileage])
+		}
 	end
 end
 
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+
+def save_theta(theta)
+	begin
+		File.write 'theta.data', Marshal.dump(theta)
+	rescue
+		raise 'failed to save theta'
+	end
+	puts ''
+	puts 'Saved theta.'.green
+end
+
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+
 def solve_linear_regression(data)
 
-	# # FIXME
-	# puts 'FIXME: SCALING DATA'
-	# old_data = data
-	# data = calc_scaled_data(data)
-	# # FIXME
-
 	puts 'Data:'.yellow
-	data.each { |point| puts "--> Mileage: #{point[:mileage]} \t Price: #{point[:price]}" }
+	puts 'km,price'
+	data.each { |point| puts "#{point[:mileage]},#{point[:price]}" }
 
 	data_count = data.count
 	puts 'Data Count: '.yellow + data_count.to_s
@@ -124,33 +146,21 @@ def solve_linear_regression(data)
 	puts ''
 	puts "estimatedPrice(mileage) = #{slope}(mileage) + #{y_intercept}".green
 
-	# # FIXME
-	# max, min = calc_data_max_min(old_data)
-
-	# slope = slope
-	# puts ''
-	# puts 'Unscaled...?'
-	# puts "estimatedPrice(mileage) = #{slope}(mileage) + #{y_intercept}".green
-	# # FIXME
-
 	# Save theta
-	begin
-		File.write 'theta.data', Marshal.dump([y_intercept, slope])
-	rescue
-		raise 'failed to save theta'
-	end
+	save_theta([y_intercept, slope])
 end
 
+def solve_with_standardized_data(data)
+	solve_linear_regression calc_standardized_data(data, data.count)
+end
 
+def solve_with_scaled_data(data)
+	solve_linear_regression calc_scaled_data(data)
+end
 
-
-
-
-
-
-
-
-
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
 def calc_estimated_price(slope, y_intercept, mileage)
 	estimated_price = (slope * mileage) + y_intercept
@@ -165,73 +175,123 @@ def calc_mean_partial_error(slope, y_intercept, data, data_count)
 	slope_error       = 0.0
 	y_intercept_error = 0.0
 	data.each do |point|
-		y_intercept_error +=  calc_estimated_price(slope, y_intercept, point[:mileage]) - point[:price]
 		slope_error       += (calc_estimated_price(slope, y_intercept, point[:mileage]) - point[:price]) * point[:mileage]
+		y_intercept_error +=  calc_estimated_price(slope, y_intercept, point[:mileage]) - point[:price]
 	end
 	return (slope_error / data_count), (y_intercept_error / data_count)
 end
 
 def teach(data)
+	data_count = data.count
+
 	# Fresh new values
-	# slope = 0.0
-	# y_intercept = 0.0
 	slope = 0.0
-	y_intercept = 8499
+	# y_intercept = 0.0
+	# slope = -0.8561394207905021
+	# y_intercept = 2.8550912974585844e-16
+	mean = calc_mean(data, data_count)
+	y_intercept = mean[:price]
 
 	# Standard learning rate for now
-	slope_learning_rate = 0.1
-	y_intercept_learning_rate = 1000
-
-	# Get static variables
-	data_count = data.count
-	# mean = calc_mean(data, data_count)
-	# # FIXME
-	# y_intercept = mean[:price]
-	# # FIXME
-
-	# # Standardize data
-	# std_data = calc_standardized_data(data, data_count)
-	# # p std_data
+	learning_rate = 1.0
+	# learning_rate_calibrated = false
+	# slope_learning_rate = 0.1
+	# y_intercept_learning_rate = 1000
 
 	# Calculate theta
 	iteration = 0
+	done_training = false
+	theta_history = []
 	prev_slope_error, prev_y_intercept_error = calc_mean_partial_error(slope, y_intercept, data, data_count)
 	puts "Iteration 0".yellow
 	puts "Slope: #{slope} \t Y Intercept: #{y_intercept}"
 
-	while $stdin.gets.chomp != 'q' do
-		10.times do
-			puts "Iteration #{iteration += 1}".yellow
-			slope_error, y_intercept_error = calc_mean_partial_error(slope, y_intercept, data, data_count)
-			puts "Slope Error: #{slope_error} \t Y Intercept Error: #{y_intercept_error}"
-			puts "Slope Error #{slope_error.abs < prev_slope_error.abs ? 'decreased' : 'increased'} \t Y Intercept Error #{y_intercept_error.abs < prev_y_intercept_error.abs ? 'decreased' : 'increased'}"
-			if slope_error.abs < prev_slope_error.abs
-				slope_learning_rate *= 1.05
-			else
-				slope_learning_rate *= 0.50
+	begin
+		while $stdin.gets.chomp != 'q' do
+			10.times do
+				puts "Iteration #{iteration += 1}".yellow
+				theta_history << [y_intercept, ',', slope]
+				slope_error, y_intercept_error = calc_mean_partial_error(slope, y_intercept, data, data_count)
+				puts "Slope Error: #{slope_error} \t Y Intercept Error: #{y_intercept_error}"
+				raise ThetaDiverged if slope_error.infinite? || y_intercept_error.infinite?
+				if slope_error.abs < prev_slope_error.abs && y_intercept_error.abs < prev_y_intercept_error.abs
+					puts "Slope Error #{'decreased'.green} \t Y Intercept Error #{'decreased'.green}"
+					learning_rate *= 1.05
+					# learning_rate_calibrated = true
+				elsif slope_error.abs == prev_slope_error.abs && y_intercept_error.abs == prev_y_intercept_error.abs
+					if iteration != 1
+						puts "\nSlope and Y Intercept converged!".green
+						done_training = true
+						break
+					end
+					# puts "Slope and Y Intercept Error did not change".red if iteration != 1
+					# learning_rate *= 0.95
+				else
+					puts "Slope Error #{slope_error.abs < prev_slope_error.abs ? 'decreased'.green : 'increased'.red} \t Y Intercept Error #{y_intercept_error.abs < prev_y_intercept_error.abs ? 'decreased'.green : 'increased'.red}"
+					learning_rate *= 0.90
+					# learning_rate *= 0.50
+					# learning_rate_calibrated = true if slope_error.abs < prev_slope_error.abs
+					# if learning_rate_calibrated == false
+					# 	slope_error, y_intercept_error = prev_slope_error.abs * (slope_error / slope_error.abs), prev_y_intercept_error.abs * (y_intercept_error / y_intercept_error.abs)
+					# 	puts "Slope Error: #{slope_error} \t Y Intercept Error: #{y_intercept_error}".red
+					# end
+				end
+				# learning_rate = 0.0001 if learning_rate < 0.00000001
+				# learning_rate *= 0.99
+				puts "Learning Rate: #{learning_rate}"
+				# if slope_error.abs < prev_slope_error.abs
+				# 	slope_learning_rate *= 1.05
+				# else
+				# 	slope_learning_rate *= 0.50
+				# end
+				# if y_intercept_error.abs < prev_y_intercept_error.abs
+				# 	y_intercept_learning_rate *= 2.00
+				# else
+				# 	y_intercept_learning_rate *= 0.10
+				# end
+				# puts "Slope Learning Rate: #{slope_learning_rate} \t Y Intercept Learning Rate: #{y_intercept_learning_rate}"
+				puts "Slope Diff: #{learning_rate * slope_error * -1.0} \t Y Intercept Diff: #{learning_rate * y_intercept_error * -1.0}"
+				slope       -= learning_rate * slope_error
+				y_intercept -= learning_rate * y_intercept_error
+				# slope       -= slope_learning_rate       * (slope_error       / slope_error.abs)
+				# y_intercept -= y_intercept_learning_rate * (y_intercept_error / y_intercept_error.abs)
+				prev_slope_error, prev_y_intercept_error = slope_error, y_intercept_error
+				# # FIXME
+				# y_intercept = mean[:price] - (slope * mean[:mileage])
+				# # FIXME
+				puts "Slope: #{slope} \t Y Intercept: #{y_intercept}"
 			end
-			if y_intercept_error.abs < prev_y_intercept_error.abs
-				y_intercept_learning_rate *= 2.00
-			else
-				y_intercept_learning_rate *= 0.10
-			end
-			puts "Slope Learning Rate: #{slope_learning_rate} \t Y Intercept Learning Rate: #{y_intercept_learning_rate}"
-			# slope       -= learning_rate * slope_error
-			# y_intercept -= learning_rate * y_intercept_error
-			slope       -= slope_learning_rate       * (slope_error       / slope_error.abs)
-			y_intercept -= y_intercept_learning_rate * (y_intercept_error / y_intercept_error.abs)
-			prev_slope_error, prev_y_intercept_error = slope_error, y_intercept_error
-			# # FIXME
-			# y_intercept = mean[:price] - (slope * mean[:mileage])
-			# # FIXME
-			puts "Slope: #{slope} \t Y Intercept: #{y_intercept}"
+			break if done_training
 		end
+
+		puts ''
+		puts 'Slope:       '.yellow + slope.to_s
+		puts 'Y Intercept: '.yellow + y_intercept.to_s
+
+		# Write new theta
+		save_theta([y_intercept, slope])
+
+	rescue ThetaDiverged
+		puts 'Error: slope and y-intercept diverged'.red
 	end
 
-	# Write new theta
+	puts ''
 	begin
-		File.write 'theta.data', Marshal.dump([y_intercept, slope])
-	rescue
-		raise 'failed to save theta'
+		$stdin.flush
+		print 'Output theta history? (y/n) : '
+		input = $stdin.gets.chomp
+	end while input != 'y' && input != 'n'
+
+	if input == 'y'
+		puts 'y-intercept,slope'
+		puts theta_history.map(&:join).join("\n")
 	end
+end
+
+def teach_with_scaled(data)
+	teach calc_scaled_data(data)
+end
+
+def teach_with_standardized(data)
+	teach calc_standardized_data(data, data.count)
 end
